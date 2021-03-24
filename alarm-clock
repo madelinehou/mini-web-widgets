@@ -1,0 +1,145 @@
+# IMPORT: for the user interface
+import ipywidgets as w
+
+# IMPORT: for the alarm
+import datetime
+from time import strftime, sleep
+import winsound
+import glob
+
+# For the alarm sounds: collect all windows default sounds
+source = 'C:\Windows\Media\\'
+files = [f.split('\\')[-1] for f in glob.glob(f"{source}*.wav")]
+
+# UI: dropdown to select a sound file
+dropdown = w.Dropdown(
+    options=files,
+    value=files[0],
+)
+
+# UI: button to test the alarm sound
+test = w.Button(
+    description="Test alarm",
+    button_style='info',
+    icon='volume-up',
+)
+
+# UI: button to show the current time when clicked (not running)
+current = w.ToggleButton(
+    value=False,
+    description='Current time',
+    button_style='warning',
+    icon='hourglass',
+)
+
+# UI: option for the alarm sound to loop
+repeat = w.Checkbox(
+    value=False,
+    description='Loop alarm sound',
+    indent=False,
+)
+
+# UI: selection for the target hour
+hours = w.SelectionSlider(
+    options=[str(i).zfill(2) for i in range(24)],
+    value='00',
+    description='Hour ',
+)
+
+# UI: selection for the target minute
+mins = w.SelectionSlider(
+    options=[str(i).zfill(2) for i in range(60)],
+    value='00',
+    description='Minute ',
+)
+
+# UI: selection for the target second
+secs = w.SelectionSlider(
+    options=[str(i).zfill(2) for i in range(60)],
+    value='00',
+    description='Second ',
+)
+
+# UI: button to set alarm
+enter = w.ToggleButton(
+    value=False,
+    description='Set',
+    button_style='success',
+    icon='history',
+)
+
+# UI: button to stop the alarm from crashing when interrupted, stops the alarm in conjunction with the Jupyter Notebook 'interrupt the kernel' button
+stop = w.Button(
+    description="Stop",
+    button_style='danger',
+    icon='times',
+)
+
+# UI: a text box to write notes in
+notes = w.Textarea(
+    placeholder='Note',
+)
+
+# FUNCTION: play alarm sound, loop if option is true
+def sound():
+    if repeat.value == False:
+        winsound.PlaySound(f"{source}{dropdown.value}",winsound.SND_ASYNC)
+    else:
+        winsound.PlaySound(f"{source}{dropdown.value}", winsound.SND_LOOP + winsound.SND_ASYNC)
+
+# FUNCTION: reset 'set alarm' button, clear printed output
+def clear():
+    enter.value = False
+    out.clear_output()
+
+# FUNCTION: assign sound function to 'test sound' button
+def test_sound(b):
+    sound()
+test.on_click(test_sound)
+
+# FUNCTION: set selection sliders to current time when 'current time' button is clicked
+def set_now(b):
+    if current.value == True:
+        now = strftime("%H:%M:%S")
+        hours.value = now[0:2]
+        mins.value = now[3:5]
+        secs.value = now[6:8]
+current.observe(set_now,'value')
+hours.observe(set_now,'value')
+mins.observe(set_now,'value')
+secs.observe(set_now,'value')
+
+# Define the printed output
+out = w.Output()
+
+# FUNCTION: print a running clock
+def clock(b):
+    with out:
+        while enter.value == True:
+            now = strftime("%H:%M:%S")
+            then = f"{hours.value}:{mins.value}:{secs.value}"
+            print(f"Current time: {now}", end="", flush=True)
+            print("\r", end="", flush=True)
+            sleep(1)
+            if now == then:
+                clear()
+                sound()
+                print("Done")
+enter.observe(clock,'value')
+
+# FUNCTION: stop the alarm sound if playing, prevent the Notebook from crashing when the alarm clock is interrupted
+def reset(b):
+    with out:
+        if enter.value == True:
+            clear()
+            print("Stopped")
+    winsound.PlaySound(None, winsound.SND_PURGE)
+stop.on_click(reset)
+
+# DISPLAY
+alarm = w.HBox([dropdown,test,current])
+time = w.HBox([hours,mins,secs])
+buttons = w.VBox([enter,stop])
+select = w.HBox([buttons,notes])
+
+w.VBox([alarm,repeat,time,select,out])
